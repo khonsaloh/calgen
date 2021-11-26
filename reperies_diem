@@ -1,0 +1,161 @@
+#!/bin/sh
+
+help() {
+cat << EOF
+-d para ver el dia de la semana en la que cayó un fecha formato DD-MM-AAAA
+-p para ver cuando cae domingo de pascua
+-x para ver anos do xacobeo
+-a para ver ascension
+-t para ver accion de gracias (eeuu)
+-n para ver dia da nai
+-m para ver virxe da barca
+-c para ver martes de carnaval
+-v para ver venres santo
+-b para ver black friday
+-hi para ver cambio horario inverno
+-hv para ver cambio horario veran
+-dc para ver o desembarco de catoira
+EOF
+}
+
+[ -z "$1" ] && help && exit 0
+
+
+# [+] se pueden generar con reglas dentro de la propia app con RRULE
+# [*] normalmente van a precisar de una función integrada o añadir año a año el evento ya que son mas volátiles
+
+anus=$(date +%Y)
+limite=2100
+#resaltar_fecha_actual=
+
+# primeiro domingo de agosto [+]
+desembarco_vikingo_catoira() {
+for i in $(seq $anus $limite); do
+	dia=$(ncal 08 $i | awk '/do/ {print $2}') 
+	echo $dia/08/$i
+done
+}
+
+# primer domingo de mayo (en españa) [+]
+dia_da_nai() {
+for i in $(seq $anus $limite); do
+	dia=$(ncal 05 $i | awk '/do/ {print $2}') 
+	echo $dia/05/$i
+done
+}
+
+# na ortodoxa é outra fecha [*]
+pascua() {
+for i in $(seq $anus $limite); do
+	ncal -e $i
+	echo "$(echo $i$(ncal -e $i | cut -d'/' -f2,1) | tr -d '/')" >> /tmp/pascua
+done
+}
+
+# festivo nacional [*]
+viernes_santo() {
+for i in $(seq $anus $limite); do
+	date -d "$(ncal -e $i | awk -F/ '{print $3$2$1}') -2 days" +%d/%m/%Y || exit 1 # esto peta en 32 bits a partir do ano 2038
+done
+}
+
+# 4º jueves de noviembre [+]
+accion_de_grazas_eeuu() {
+for i in $(seq $anus $limite); do
+	echo $(ncal 11 $i | awk '/ju/ {print $5}')/11/$i
+done
+}
+
+# La romería de A Barca se celebra el segundo domingo de septiembre, excepto cuando ese domingo es día 8. Entonces pasa al siguiente, que cae en 15
+# “La romería de A Barca no baja de nueve ni sube de quince" [*]
+a_barca_muxia() {
+for i in $(seq $anus $limite); do
+	[ $(ncal 09 $i | awk '/do/ {print $3}') -lt 9 ] \
+		&& echo $(ncal 09 $i | awk '/do/ {print $4}')/09/$i \
+		|| echo $(ncal 09 $i | awk '/do/ {print $3}')/09/$i
+done
+}
+
+# ocurre cando o 25 de julio cae a domingo, mostra sempre o mesmo patrón de mes [*]
+ano_santo() {
+for i in $(seq $anus $limite); do
+	[ -n "$(ncal 07 $i  | grep do | grep 25)" ] && echo 25/07/$i
+done
+}
+
+#ano_santo() {
+#for i in $(seq 2021 2039); do
+#	[ $(date -d "$i"0725 +%u) -eq 7 ] && echo 25/07/$i
+#done
+#}
+
+# corenta dias antes do domingo de ramos (coresma desde carnaval), este a súa vez o domingo anterior ao domingo de pascua
+# aqui ahi que ter en conta se o ano é bisiesto [*]
+martes_de_carnaval() {
+for i in $(seq $anus $limite); do
+	date -d "$(ncal -e $i | awk -F/ '{print $3$2$1}') -47 days" +%d/%m/%Y || exit 1 # esto peta en 32 bits a partir do ano 2038
+done
+}
+
+# cuarenta dias despois do domingo de pascua [*]
+ascension() {
+for i in $(seq $anus $limite); do
+	date -d "$(ncal -e $i | awk -F/ '{print $3$2$1}') +39 days" +%d/%m/%Y || exit 1 # esto peta en 32 bits a partir do ano 2038
+done
+}
+
+# dia despois de accion de grazas [+]
+black_friday() {
+for i in $(seq $anus $limite); do
+	date -d "$i/11/$(ncal 11 $i | awk '/ju/ {print $5}') +1 days" +%d/%m/%Y || exit 1
+done
+}
+# lunes posterior a black friday [+]
+cyber_monday() {
+for i in $(seq $anus $limite); do
+	date -d "$i/11/$(ncal 11 $i | awk '/ju/ {print $5}') +4 days" +%d/%m/%Y || exit 1
+done
+}
+
+# esto é para os reloxos analóxicos [+]
+cambio_h_inverno() {
+for i in $(seq $anus $limite); do
+	echo $(ncal 03 $i | awk '/do/ {print $NF}')/03/$i
+done
+}
+# [+]
+cambio_h_vrao() {
+for i in $(seq $anus $limite); do
+	echo $(ncal 10 $i | awk '/do/ {print $NF}')/10/$i
+done
+}
+
+entrada="
+BEGIN:VCALENDAR
+BEGIN:VEVENT
+DTSTART:20160731
+DTEND:20160731
+RRULE:FREQ=MONTHLY;BYDAY=SU,MO,TU,WE,TH,FR,SA;BYSETPOS=-1;WKST=SU
+SUMMARY:
+END:VEVENT
+END:VCALENDAR
+"
+
+while getopts ":dhvpabxntmc" opt; do
+	case "$opt" in
+		d) date -d $(echo "$OPTARG"|awk -F- '{print $3 "-" $2 "-" $1}' | tr -d '-') +%A && exit ;;
+		dc) desembarco_vikingo_catoira ;;
+		p) pascua ;;
+		t) accion_de_grazas_eeuu ;;
+		v) viernes_santo ;;
+		a) ascension ;;
+		b) black_friday ;;
+		x) ano_santo ;;
+		n) dia_da_nai ;;
+		hi) cambio_h_inverno ;;
+		hv) cambio_h_vrao ;;
+		m) a_barca_muxia ;;
+		c) martes_de_carnaval ;;
+		*) help ;;
+	esac
+done
