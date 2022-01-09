@@ -8,29 +8,30 @@ cat << EOF
 -c para exportar martes de carnaval
 -m para exportar a barca muxia
 -y para asignar periodo de anos a exportar (por defecto es 10 años mas a partir del año actual)
+-s para simular sin exportar
 EOF
 }
 
 [ -z "$1" ] && auxilium && exit
 
 domingo_pascual() {
-a=$(($anus%19))
+a=$((anus%19))
 
-b=$(($anus%4)) ; c=$(($anus%7))
-k=$(($anus/100))
+b=$((anus%4)) ; c=$((anus%7))
+k=$((anus/100))
 
-p=$(($((3+8*$k))/25))
-q=$(($k/4))
-m=$(($((15-$p+$k-q))%30))
+p=$(($((3+8*k))/25))
+q=$((k/4))
+m=$(($((15-p+k-q))%30))
 
-n=$(($((4+$k-$q))%7))
+n=$(($((4+k-q))%7))
 
-d=$(($((19*$a+$m))%30))
+d=$(($((19*a+m))%30))
 
-e=$(($((2*$b+4*$c+6*$d+$n))%7))
+e=$(($((2*b+4*c+6*d+n))%7))
 
-[ $(($d+$e)) -lt 10 ] && fecha="$anus"03$(($d+$e+22))
-[ $(($d+$e)) -ge 10 ] && fecha="$anus"04$(($d+$e-9))
+[ $((d+e)) -lt 10 ] && fecha="$anus"03$((d+e+22))
+[ $((d+e)) -ge 10 ] && fecha="$anus"04$((d+e-9))
 
 [ $d -eq 28 ] && [ $e -eq 6 ] && [ $a -gt 10 ] && [ $fecha = "$anus"0425 ] \
 	&& fecha="$anus"0418
@@ -54,7 +55,7 @@ bloque () {
 cat << EOF
 BEGIN:VEVENT
 DTSTART;VALUE=DATE:"$fecha"
-DTEND;VALUE=DATE:"$(($fecha+1))"
+DTEND;VALUE=DATE:"$((fecha+1))"
 DTSTAMP:"$fecha"T161541Z
 UID:"$rand"
 CREATED:"$fecha"T161522Z
@@ -101,19 +102,20 @@ echo $fecha
 }
 
 [ -z $anus ] && anus=$(date +%Y)
-limite=$(($anus+10))
+limite=$((anus+10))
 loop() {
 for i in $(seq $anus $limite); do
 	$1
 	id
 	exportar
-	anus=$(($i+1))
+	anus=$((i+1))
 done
 }
 
-while getopts ":vpacmy" opt; do
+while getopts ":vpacmsy:" opt; do
         case "$opt" in
-                y) anus=$OPTARG;;
+                s) a_exporte=/dev/null;;
+                y) anus=$OPTARG; limite=$((anus+10));;
                 p) asignacion && loop domingo_pascual ;;
                 v) dies="-2 days" && asignacion && loop derivado_pascua ;;
                 c) dies="-47 days" && asignacion && loop derivado_pascua ;;
