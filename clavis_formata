@@ -2,53 +2,45 @@
 
 auxilium() {
 cat << EOF
--p para exportar domingo de pascua
--a para exportar ascension
--v para exportar viernes santo
--c para exportar martes de carnaval
--m para exportar a barca muxia
--y para asignar periodo de anos a exportar (por defecto es 10 años mas a partir del año actual)
--s para simular sin exportar
+ -p   para exportar domingo de pascua
+ -a   para exportar ascension
+ -v   para exportar viernes santo
+ -c   para exportar martes de carnaval
+ -m   para exportar a barca muxia
+ -y   para asignar periodo de anos a exportar (por defecto es 10 años mas a partir del año actual)
+ -s   para simular sin exportar
 EOF
 }
 
-[ -z "$1" ] && auxilium && exit
-
 domingo_pascual() {
-a=$((anus%19))
-
-b=$((anus%4)) ; c=$((anus%7))
-k=$((anus/100))
-
-p=$(($((3+8*k))/25))
-q=$((k/4))
-m=$(($((15-p+k-q))%30))
-
-n=$(($((4+k-q))%7))
-
-d=$(($((19*a+m))%30))
-
-e=$(($((2*b+4*c+6*d+n))%7))
-
-[ $((d+e)) -lt 10 ] && fecha="$anus"03$((d+e+22))
-[ $((d+e)) -ge 10 ] && fecha="$anus"04$((d+e-9))
-
-[ $d -eq 28 ] && [ $e -eq 6 ] && [ $a -gt 10 ] && [ $fecha = "$anus"0425 ] \
-	&& fecha="$anus"0418
-[ $fecha = "$anus"0426 ] && fecha="$anus"0419
-[ $(echo $fecha | wc -c) -le 8 ] \
-	&& fecha=$(echo $fecha | sed 's/./&0/6')
-echo $fecha
+  a=$((anus%19))
+  b=$((anus%4)) ; c=$((anus%7))
+  k=$((anus/100))
+  p=$(($((3+8*k))/25))
+  q=$((k/4))
+  m=$(($((15-p+k-q))%30))
+  n=$(($((4+k-q))%7))
+  d=$(($((19*a+m))%30))
+  e=$(($((2*b+4*c+6*d+n))%7))
+  
+  [ $((d+e)) -lt 10 ] && fecha="$anus"03$((d+e+22))
+  [ $((d+e)) -ge 10 ] && fecha="$anus"04$((d+e-9))
+  
+  [ $d -eq 28 ] && [ $e -eq 6 ] && [ $a -gt 10 ] \
+    && [ "$fecha" = "$anus"0425 ] && fecha="$anus"0418
+  [ $fecha = "$anus"0426 ] && fecha="$anus"0419
+  [ $(echo $fecha | wc -c) -le 8 ] \
+  	&& fecha=$(echo $fecha | sed 's/./&0/6')
+  echo $fecha
 }
-
 
 a_exporte=exporte.ics
 
 id() {
-rand="$(tr -dc A-Fa-f0-9 </dev/urandom | head -c 45 ; echo '')"
-[ -f $a_exporte ] && while $(grep -w $rand exporte.ics); do
-	rand="$(tr -dc A-Fa-f0-9 </dev/urandom | head -c 45 ; echo '')"
-done
+  rand="$(tr -dc A-Fa-f0-9 </dev/urandom | head -c 45 ; echo '')"
+  [ -f $a_exporte ] && while $(grep -w $rand exporte.ics); do
+  	rand="$(tr -dc A-Fa-f0-9 </dev/urandom | head -c 45 ; echo '')"
+  done
 }
 
 bloque () {
@@ -78,56 +70,88 @@ done
 }
 
 asignacion() {
-printf 'nombre do evento: ' \
-	&& read -r titulo
-printf 'descripcion do evento: ' \
-	&& read -r descripcion
+  printf '%s' "nombre do evento para $_titulo: " \
+  	&& read -r titulo
+  printf '%s' "descripcion do evento $_titulo: " \
+  	&& read -r descripcion
 }
 
 derivado_pascua() {
 	domingo_pascual >/dev/null
-	[ -n "$fecha" ] && fecha=$(date -d ""$fecha" $dies" +%Y%m%d)
+	fecha=$(date -d ""$fecha" $dies" +%Y%m%d)
 	echo $fecha
 }
+
 muxia() {
-dom=$(for i in $(seq -w 01 30); do
-	date -d ""$anus"09"$i"" '+%u %Y%m%d' | grep '^7'
-done | cut -d' ' -f2 | sed -n '2p')
-
-doma=$(for i in $(seq -w 01 30); do
-	date -d ""$anus"09"$i"" '+%u %Y%m%d' | grep '^7'
-done | cut -d' ' -f2 | sed -n '3p')
-[ $(echo $dom | tail -c 3) -lt 9 ] && fecha=$doma || fecha=$dom
-echo $fecha
+  dom=$(for i in $(seq -w 01 30); do
+  	date -d ""$anus"09"$i"" '+%u %Y%m%d' | grep '^7'
+  done | cut -d' ' -f2 | sed -n '2p')
+  
+  doma=$(for i in $(seq -w 01 30); do
+  	date -d ""$anus"09"$i"" '+%u %Y%m%d' | grep '^7'
+  done | cut -d' ' -f2 | sed -n '3p')
+  [ $(echo $dom | tail -c 3) -lt 9 ] && fecha=$doma || fecha=$dom
+  echo $fecha
 }
 
-[ -z $anus ] && anus=$(date +%Y)
-limite=$((anus+10))
 loop() {
-for i in $(seq $anus $limite); do
-	$1
-	id
-	exportar
-	anus=$((i+1))
-done
+  for i in $(seq $anus $limite); do
+    $1
+    id
+    exportar
+    anus=$((i+1))
+  done
 }
 
-while getopts ":vpacmsy:" opt; do
-        case "$opt" in
-                s) a_exporte=/dev/null;;
-                y) anus=$OPTARG; limite=$((anus+10));;
-                p) asignacion && loop domingo_pascual ;;
-                v) dies="-2 days" && asignacion && loop derivado_pascua ;;
-                c) dies="-47 days" && asignacion && loop derivado_pascua ;;
-                a) dies="+39 days" && asignacion && loop derivado_pascua ;;
-                m) asignacion && loop muxia ;;
-                *) auxilium && exit;;
-        esac
+resetear_fecha() {
+  anus=${anus_input:-$(date +%Y)}
+  [ -n "$limite_input" ] && limite=$((anus+limite_input)) \
+    || limite=$((anus+10))
+}
+
+while getopts 'vpacmsy:l:' opt; do
+  case "$opt" in
+    s) a_exporte=/dev/null;;
+    y) anus_input=$OPTARG;;
+    l) limite_input=$OPTARG;;
+    p) pascua=si ;;
+    v) viernes=si ;;
+    c) carnaval=si;;
+    a) ascension=si ;;
+    m) muxia=si ;;
+    *) auxilium;;
+  esac
 done
+
+shift $((OPTIND - 1))
+
+[ -e $a_exporte ] && [ $a_exporte != /dev/null ] \
+  && printf '%s' "$a_exporte ya exite, quieres editarlo con este script? (s/n)" \
+  && read -r respuesta && [ $respuesta != s ] && exit
+
+if [ -n "$viernes" ]; then
+  resetear_fecha
+  dies="-2 days"; _titulo=viernes_santo; asignacion; loop derivado_pascua
+fi
+if [ -n "$pascua" ]; then
+  resetear_fecha
+  _titulo=pascua ; asignacion && loop domingo_pascual
+fi
+if [ -n "$muxia" ]; then
+  resetear_fecha
+  _titulo=muxia; asignacion && loop muxia
+fi
+if [ -n "$ascension" ]; then
+  resetear_fecha
+  dies="+39 days"; _titulo=ascension; asignacion; loop derivado_pascua
+fi
+if [ -n "$carnaval" ]; then
+  resetear_fecha
+  dies="-47 days"; _titulo=martes_carnaval; asignacion && loop derivado_pascua 
+fi
+
 [ ! -f $a_exporte ] && exit
 sed -i '/BEGIN:VCALENDAR/d' $a_exporte
 sed -i '/END:VCALENDAR/d' $a_exporte
-
 sed -i '1s/^/BEGIN:VCALENDAR\n/' $a_exporte
 sed -i -e '$aEND:VCALENDAR' $a_exporte
-
