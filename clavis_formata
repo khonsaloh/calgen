@@ -1,5 +1,7 @@
 #!/bin/sh
 
+a_exporte=exporte.ics
+
 auxilium() {
 cat << EOF
  -p   para exportar domingo de pascua
@@ -7,14 +9,15 @@ cat << EOF
  -v   para exportar viernes santo
  -c   para exportar martes de carnaval
  -m   para exportar a barca muxia
- -y   para asignar periodo de anos a exportar (por defecto es 10 años mas a partir del año actual)
+ -y   para especificar desde el año que comienza el conteo
  -s   para simular sin exportar
+ -l   para especificar el número de años hasta donde contar
 EOF
 }
 
 domingo_pascual() {
   a=$((anus%19))
-  b=$((anus%4)) ; c=$((anus%7))
+  b=$((anus%4)); c=$((anus%7))
   k=$((anus/100))
   p=$(($((3+8*k))/25))
   q=$((k/4))
@@ -33,8 +36,6 @@ domingo_pascual() {
   	&& fecha=$(echo $fecha | sed 's/./&0/6')
   echo $fecha
 }
-
-a_exporte=exporte.ics
 
 id() {
   rand="$(tr -dc A-Fa-f0-9 </dev/urandom | head -c 45 ; echo '')"
@@ -63,7 +64,7 @@ EOF
 }
 
 exportar() {
-bloque |
+bloque 2>/dev/null |
         while IFS= read -r line; do
                 echo "$line" | tr -d '"' >> $a_exporte
 done
@@ -78,7 +79,8 @@ asignacion() {
 
 derivado_pascua() {
 	domingo_pascual >/dev/null
-	fecha=$(date -d ""$fecha" $dies" +%Y%m%d)
+  [ -z "$pretty_date" ] && fecha=$(date -d "$fecha $dies" +%Y%m%d) \
+    || fecha=$(date -d "$fecha $dies" '+%Y/%m/%d')
 	echo $fecha
 }
 
@@ -111,7 +113,7 @@ resetear_fecha() {
 
 while getopts 'vpacmsy:l:' opt; do
   case "$opt" in
-    s) a_exporte=/dev/null;;
+    s) a_exporte=/dev/null; pretty_date=si;;
     y) anus_input=$OPTARG;;
     l) limite_input=$OPTARG;;
     p) pascua=si ;;
@@ -131,11 +133,11 @@ shift $((OPTIND - 1))
 
 if [ -n "$viernes" ]; then
   resetear_fecha
-  dies="-2 days"; _titulo=viernes_santo; asignacion; loop derivado_pascua
+  dies="-2 days"; _titulo="viernes santo"; asignacion; loop derivado_pascua
 fi
 if [ -n "$pascua" ]; then
   resetear_fecha
-  _titulo=pascua ; asignacion && loop domingo_pascual
+  _titulo="domingo de pascua" ; asignacion && loop derivado_pascua
 fi
 if [ -n "$muxia" ]; then
   resetear_fecha
@@ -147,7 +149,7 @@ if [ -n "$ascension" ]; then
 fi
 if [ -n "$carnaval" ]; then
   resetear_fecha
-  dies="-47 days"; _titulo=martes_carnaval; asignacion && loop derivado_pascua 
+  dies="-47 days"; _titulo="martes de carnaval"; asignacion && loop derivado_pascua 
 fi
 
 [ ! -f $a_exporte ] && exit
